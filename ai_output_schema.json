@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI Customer Triage Output",
+  "type": "object",
+  "required": ["category", "confidence", "summary", "risk", "needs_human"],
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": ["billing", "technical", "sales", "other"],
+      "description": "The classified category of the customer request."
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Model confidence score between 0 and 1."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Brief summary of the customer message."
+    },
+    "risk": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Risk level associated with the request."
+    },
+    "needs_human": {
+      "type": "boolean",
+      "description": "Whether a human agent must review this request."
+    }
+  }
+}

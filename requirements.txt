@@ -1,0 +1,8 @@
+pytest==7.4.0
+fastapi
+uvicorn[standard]
+httpx
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
+email-validator

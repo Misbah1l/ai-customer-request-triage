@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Customer Request Triage</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="app-header">
+            <div class="header-content">
+                <h1>AI Customer Request Triage</h1>
+                <p class="subtitle">
+                    Automatically classify, validate, and route customer support messages using AI.
+                    High-risk or low-confidence requests are escalated to human review.
+                </p>
+            </div>
+        </header>
+
+        <main>
+            <section id="auth-section" class="auth-section">
+                <div class="auth-card">
+                    <h2 id="auth-heading">Sign In</h2>
+                    <p class="section-description">Enter your credentials to access your workspace.</p>
+                    <form id="login-form" novalidate>
+                        <label for="login-email">Email</label>
+                        <input type="email" id="login-email" required autocomplete="email" />
+                        <label for="login-password">Password</label>
+                        <input type="password" id="login-password" required autocomplete="current-password" />
+                        <button type="submit" id="login-btn">Sign In</button>
+                        <p class="auth-switch">
+                            Don't have an account? <button type="button" id="show-register" class="link-btn">Create one</button>
+                        </p>
+                    </form>
+                    <form id="register-form" class="hidden" novalidate>
+                        <label for="register-name">Full Name</label>
+                        <input type="text" id="register-name" required autocomplete="name" />
+                        <label for="register-email">Email</label>
+                        <input type="email" id="register-email" required autocomplete="email" />
+                        <label for="register-password">Password</label>
+                        <input type="password" id="register-password" required minlength="8" autocomplete="new-password" />
+                        <button type="submit" id="register-btn">Create Account</button>
+                        <p class="auth-switch">
+                            Already have an account? <button type="button" id="show-login" class="link-btn">Sign in</button>
+                        </p>
+                    </form>
+                    <div id="auth-error" class="error hidden" role="alert" aria-live="assertive"></div>
+                </div>
+            </section>
+
+            <section id="dashboard-section" class="hidden">
+                <div class="user-bar">
+                    <div class="user-info">
+                        <span id="user-name" class="user-name"></span>
+                        <span id="user-org" class="user-org"></span>
+                    </div>
+                    <button id="logout-btn" type="button" class="secondary">Logout</button>
+                </div>
+
+                <section class="dashboard-stats" aria-labelledby="stats-heading">
+                    <h2 id="stats-heading" class="sr-only">Dashboard Overview</h2>
+                    <div class="stat-card">
+                        <span class="stat-label">Total Requests</span>
+                        <span id="stat-total" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-card stat-warning">
+                        <span class="stat-label">Human Review</span>
+                        <span id="stat-human-review" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-card stat-danger">
+                        <span class="stat-label">High Risk</span>
+                        <span id="stat-high-risk" class="stat-value">-</span>
+                    </div>
+                    <div class="stat-card stat-success">
+                        <span class="stat-label">Routed</span>
+                        <span id="stat-routed" class="stat-value">-</span>
+                    </div>
+                </section>
+
+                <section class="card review-section" aria-labelledby="review-heading">
+                    <div class="review-header">
+                        <h2 id="review-heading">Human Review Queue</h2>
+                        <button id="refresh-review" type="button" class="secondary" aria-label="Refresh review queue">Refresh</button>
+                    </div>
+                    <div id="review-loading" class="loading hidden" role="status" aria-live="polite">Loading review queue...</div>
+                    <div id="review-error" class="error hidden" role="alert" aria-live="assertive"></div>
+                    <div id="review-empty" class="empty-state hidden">
+                        <p>No requests currently awaiting human review.</p>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="review-table" class="hidden" aria-label="Human review queue">
+                            <thead>
+                                <tr>
+                                    <th scope="col">ID</th>
+                                    <th scope="col">Message</th>
+                                    <th scope="col">Category</th>
+                                    <th scope="col">Confidence</th>
+                                    <th scope="col">Risk</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">Assigned To</th>
+                                    <th scope="col">Timestamp</th>
+                                    <th scope="col">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="review-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="review-detail" class="card result-section hidden" aria-labelledby="review-detail-heading">
+                    <div class="result-header">
+                        <h2 id="review-detail-heading">Review Ticket Details</h2>
+                        <span id="review-detail-badge" class="badge hidden"></span>
+                    </div>
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <span class="label">Category</span>
+                            <span id="review-detail-category" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Confidence</span>
+                            <span id="review-detail-confidence" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Risk</span>
+                            <span id="review-detail-risk" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Route</span>
+                            <span id="review-detail-route" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Status</span>
+                            <span id="review-detail-status" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Assigned To</span>
+                            <span id="review-detail-assigned" class="value"></span>
+                        </div>
+                        <div class="result-item full-width">
+                            <span class="label">Summary</span>
+                            <span id="review-detail-summary" class="value"></span>
+                        </div>
+                        <div class="result-item full-width">
+                            <span class="label">Original Message</span>
+                            <span id="review-detail-input" class="value"></span>
+                        </div>
+                        <div class="result-item full-width">
+                            <span class="label">Why Human Review</span>
+                            <span id="review-detail-reason" class="value"></span>
+                        </div>
+                    </div>
+                    <div class="review-actions">
+                        <button id="review-assign-btn" type="button" class="secondary">Assign to Me</button>
+                        <button id="review-status-btn" type="button">Mark as In Review</button>
+                        <button id="review-resolve-btn" type="button" class="secondary">Resolve</button>
+                        <button id="review-close-btn" type="button" class="secondary" style="margin-left: auto;">Close</button>
+                    </div>
+                    <section class="comments-section" aria-labelledby="comments-heading">
+                        <h3 id="comments-heading">Comments</h3>
+                        <div id="comments-loading" class="loading hidden" role="status" aria-live="polite">Loading comments...</div>
+                        <div id="comments-error" class="error hidden" role="alert" aria-live="assertive"></div>
+                        <div id="comments-list" class="comments-list"></div>
+                        <form id="comment-form" class="comment-form" novalidate>
+                            <label for="comment-input">Add a comment</label>
+                            <textarea id="comment-input" rows="2" placeholder="Type your note here..." required></textarea>
+                            <button type="submit" id="comment-submit-btn">Post Comment</button>
+                        </form>
+                    </section>
+                </section>
+
+                <section class="card input-section" aria-labelledby="analysis-heading">
+                    <h2 id="analysis-heading">Analyze Customer Request</h2>
+                    <p class="section-description">
+                        Paste a customer support message below. The system will classify it, assess risk,
+                        and route it to the appropriate team or flag it for human review.
+                    </p>
+                    <label for="request-input">Customer message</label>
+                    <textarea
+                        id="request-input"
+                        placeholder="Paste or type a customer support message here..."
+                        rows="5"
+                        aria-describedby="input-help"
+                    ></textarea>
+                    <span id="input-help" class="sr-only">Enter the full customer support message to analyze.</span>
+                    <div class="actions">
+                        <button id="analyze-btn" type="button">Analyze Request</button>
+                        <button id="clear-btn" type="button" class="secondary">Clear</button>
+                    </div>
+                    <div id="loading" class="loading hidden" role="status" aria-live="polite">Processing request...</div>
+                    <div id="error-message" class="error hidden" role="alert" aria-live="assertive"></div>
+                </section>
+
+                <section id="result-section" class="card result-section hidden" aria-labelledby="result-heading">
+                    <div class="result-header">
+                        <h2 id="result-heading">Classification Result</h2>
+                        <span id="result-badge" class="badge hidden"></span>
+                    </div>
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <span class="label">Category</span>
+                            <span id="result-category" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Confidence</span>
+                            <span id="result-confidence" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Risk</span>
+                            <span id="result-risk" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Route</span>
+                            <span id="result-route" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Status</span>
+                            <span id="result-status" class="value"></span>
+                        </div>
+                        <div class="result-item full-width">
+                            <span class="label">Summary</span>
+                            <span id="result-summary" class="value"></span>
+                        </div>
+                    </div>
+                    <div id="human-review-indicator" class="human-review hidden" role="alert">
+                        <span aria-hidden="true">&#9888;</span> Human review required
+                    </div>
+                </section>
+
+                <section class="card history-section" aria-labelledby="history-heading">
+                    <div class="history-header">
+                        <h2 id="history-heading">Request History</h2>
+                        <div class="history-controls">
+                            <div class="filter-group search-group">
+                                <label for="search-input">Search</label>
+                                <input
+                                    type="search"
+                                    id="search-input"
+                                    placeholder="Search messages..."
+                                    aria-label="Search customer messages"
+                                />
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-category">Category</label>
+                                <select id="filter-category" aria-label="Filter by category">
+                                    <option value="">All</option>
+                                    <option value="billing">Billing</option>
+                                    <option value="technical">Technical</option>
+                                    <option value="sales">Sales</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-risk">Risk</label>
+                                <select id="filter-risk" aria-label="Filter by risk">
+                                    <option value="">All</option>
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                            <div class="filter-group">
+                                <label for="filter-status">Status</label>
+                                <select id="filter-status" aria-label="Filter by status">
+                                    <option value="">All</option>
+                                    <option value="routed">Routed</option>
+                                    <option value="human_review">Human Review</option>
+                                    <option value="error">Error</option>
+                                </select>
+                            </div>
+                            <button id="refresh-history" type="button" class="secondary" aria-label="Refresh history">Refresh</button>
+                        </div>
+                    </div>
+                    <div id="history-loading" class="loading hidden" role="status" aria-live="polite">Loading history...</div>
+                    <div id="history-error" class="error hidden" role="alert" aria-live="assertive"></div>
+                    <div id="history-empty" class="empty-state hidden">
+                        <p>No requests match the current filters.</p>
+                    </div>
+                    <div id="history-empty-all" class="empty-state hidden">
+                        <p>No requests yet. Submit a customer request above to get started.</p>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="history-table" class="hidden" aria-label="Request history">
+                            <thead>
+                                <tr>
+                                    <th scope="col">ID</th>
+                                    <th scope="col">Message</th>
+                                    <th scope="col">Category</th>
+                                    <th scope="col">Risk</th>
+                                    <th scope="col">Route</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col">Timestamp</th>
+                                    <th scope="col"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="history-detail" class="card result-section hidden" aria-labelledby="detail-heading">
+                    <div class="result-header">
+                        <h2 id="detail-heading">Request Details</h2>
+                        <span id="detail-badge" class="badge hidden"></span>
+                    </div>
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <span class="label">Category</span>
+                            <span id="detail-category" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Confidence</span>
+                            <span id="detail-confidence" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Risk</span>
+                            <span id="detail-risk" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Route</span>
+                            <span id="detail-route" class="value"></span>
+                        </div>
+                        <div class="result-item">
+                            <span class="label">Status</span>
+                            <span id="detail-status" class="value"></span>
+                        </div>
+                        <div class="result-item full-width">
+                            <span class="label">Summary</span>
+                            <span id="detail-summary" class="value"></span>
+                        </div>
+                        <div class="result-item full-width">
+                            <span class="label">Original Message</span>
+                            <span id="detail-input" class="value"></span>
+                        </div>
+                        <div class="result-item full-width">
+                            <span class="label">Error Reason</span>
+                            <span id="detail-error" class="value"></span>
+                        </div>
+                    </div>
+                    <button id="close-detail" type="button" class="secondary" style="margin-top: 1rem;">Close</button>
+                </section>
+            </section>
+        </main>
+
+        <footer>
+            <p>AI Customer Request Triage</p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
