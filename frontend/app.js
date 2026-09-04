@@ -740,7 +740,7 @@ reviewAssignBtn.addEventListener("click", () => {
 });
 
 reviewStatusBtn.addEventListener("click", () => {
-    updateReviewStatus("triaged");
+    updateReviewStatus("in_review");
 });
 
 reviewResolveBtn.addEventListener("click", () => {
