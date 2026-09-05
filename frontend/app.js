@@ -449,6 +449,19 @@ async function loadDetail(requestId) {
 
         const data = await response.json();
 
+        const isReviewLifecycle =
+            data.status === "human_review" ||
+            data.status === "assigned" ||
+            data.status === "in_review" ||
+            data.route_to === "human_review";
+
+        if (isReviewLifecycle) {
+            historyDetail.classList.add("hidden");
+            setLoading(historyLoading, false);
+            loadReviewDetail(requestId);
+            return;
+        }
+
         detailCategory.textContent = data.category || "N/A";
         detailConfidence.textContent = data.confidence ? `${(data.confidence * 100).toFixed(1)}%` : "N/A";
         detailSummary.textContent = data.summary || "N/A";
