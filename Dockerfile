@@ -10,6 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY src/ ./src/
+ARG CACHEBURST=1
 COPY frontend/ ./frontend/
 
 ENV DATABASE_PATH=/data/requests.db
