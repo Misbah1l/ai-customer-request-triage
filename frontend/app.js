@@ -85,6 +85,14 @@ async function loadUser() {
         document.getElementById("user-org").textContent = currentUser.organization_id
             ? `Workspace #${currentUser.organization_id}`
             : "";
+        
+        // Set role badge
+        const roleBadge = document.getElementById("user-role");
+        if (roleBadge && currentUser.role) {
+            roleBadge.textContent = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
+            roleBadge.className = "role-badge " + currentUser.role;
+        }
+        
         showDashboard();
     } catch (err) {
         localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -739,6 +747,10 @@ async function bulkUpdateStatus(requestIds, status, assignedTo = null) {
 
 // Bulk Action Handlers
 async function handleReviewBulkAssign() {
+    if (!isAdmin()) {
+        showError(reviewError, "Admin privileges required for bulk actions");
+        return;
+    }
     const ids = Array.from(selectedReviewIds);
     if (ids.length === 0) return;
 
@@ -758,6 +770,10 @@ async function handleReviewBulkAssign() {
 }
 
 async function handleReviewBulkResolve() {
+    if (!isAdmin()) {
+        showError(reviewError, "Admin privileges required for bulk actions");
+        return;
+    }
     const ids = Array.from(selectedReviewIds);
     if (ids.length === 0) return;
 
@@ -773,6 +789,10 @@ async function handleReviewBulkResolve() {
 }
 
 async function handleHistoryBulkAssign() {
+    if (!isAdmin()) {
+        showError(historyError, "Admin privileges required for bulk actions");
+        return;
+    }
     const ids = Array.from(selectedHistoryIds);
     if (ids.length === 0) return;
 
@@ -791,6 +811,10 @@ async function handleHistoryBulkAssign() {
 }
 
 async function handleHistoryBulkResolve() {
+    if (!isAdmin()) {
+        showError(historyError, "Admin privileges required for bulk actions");
+        return;
+    }
     const ids = Array.from(selectedHistoryIds);
     if (ids.length === 0) return;
 
@@ -802,6 +826,10 @@ async function handleHistoryBulkResolve() {
     } catch (err) {
         showError(historyError, err.message || "Failed to bulk resolve");
     }
+}
+
+function isAdmin() {
+    return currentUser && currentUser.role === "admin";
 }
 
 function renderHistory(requests) {

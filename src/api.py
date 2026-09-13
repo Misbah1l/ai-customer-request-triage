@@ -318,8 +318,8 @@ def refresh_token(request: Request, payload: RefreshTokenRequest):
     if membership is None:
         raise HTTPException(status_code=403, detail="User does not belong to an organization")
 
-    access_token = create_access_token({"sub": str(token_data.user_id), "org_id": str(membership["organization_id"]), "role": token_data.role})
-    refresh_token = create_refresh_token({"sub": str(token_data.user_id), "org_id": str(membership["organization_id"]), "role": token_data.role})
+    access_token = create_access_token({"sub": str(token_data.user_id), "org_id": str(membership["organization_id"]), "role": membership["role"]})
+    refresh_token = create_refresh_token({"sub": str(token_data.user_id), "org_id": str(membership["organization_id"]), "role": membership["role"]})
 
     return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
 
@@ -474,6 +474,15 @@ def update_ticket_status(request: Request, request_id: int, payload: StatusUpdat
     if payload.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(sorted(valid_statuses))}")
 
+    # Check if trying to resolve a high-risk ticket - admin only
+    if payload.status == "resolved":
+        existing = get_request_by_id(request_id, organization_id=current_user.organization_id)
+        if existing and existing.get("risk") == "high" and current_user.role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Admin privileges required to resolve high-risk tickets"
+            )
+
     updated = update_request_status(
         request_id=request_id,
         organization_id=current_user.organization_id,
@@ -497,7 +506,7 @@ def update_ticket_status(request: Request, request_id: int, payload: StatusUpdat
 
 
 @app.patch("/requests/batch/status", response_model=BatchStatusUpdateResponse)
-def batch_update_ticket_status(request: Request, payload: BatchStatusUpdateRequest, current_user: TokenData = Depends(get_current_active_user)):
+def batch_update_ticket_status(request: Request, payload: BatchStatusUpdateRequest, current_user: TokenData = Depends(require_admin)):
     valid_statuses = {"new", "triaged", "assigned", "in_review", "resolved", "human_review"}
     if payload.status not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(sorted(valid_statuses))}")

@@ -139,6 +139,31 @@ body {
     color: var(--text-secondary);
 }
 
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-full);
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.25rem;
+    width: fit-content;
+}
+
+.role-badge.admin {
+    background-color: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
+}
+
+.role-badge.agent {
+    background-color: var(--primary-bg);
+    color: var(--primary);
+    border: 1px solid var(--primary-light);
+}
+
 .auth-section {
     display: flex;
     justify-content: center;
