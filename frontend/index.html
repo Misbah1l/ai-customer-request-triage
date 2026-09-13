@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Customer Request Triage</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -78,10 +79,32 @@
                     </div>
                 </section>
 
+                <section class="card analytics-section" aria-labelledby="analytics-heading">
+                    <h2 id="analytics-heading">Analytics</h2>
+                    <div class="analytics-charts">
+                        <div class="chart-wrapper">
+                            <h3>Requests by Category</h3>
+                            <canvas id="category-chart" aria-label="Donut chart showing request distribution by category"></canvas>
+                        </div>
+                        <div class="chart-wrapper">
+                            <h3>Risk Distribution</h3>
+                            <canvas id="risk-chart" aria-label="Bar chart showing risk level distribution"></canvas>
+                        </div>
+                    </div>
+                </section>
+
                 <section class="card review-section" aria-labelledby="review-heading">
                     <div class="review-header">
                         <h2 id="review-heading">Human Review Queue</h2>
                         <button id="refresh-review" type="button" class="secondary" aria-label="Refresh review queue">Refresh</button>
+                    </div>
+                    <div id="review-bulk-toolbar" class="bulk-toolbar hidden" aria-label="Bulk actions">
+                        <span id="review-bulk-count" class="bulk-count">0 selected</span>
+                        <div class="bulk-actions">
+                            <button id="review-bulk-assign" type="button" class="secondary">Assign to Me</button>
+                            <button id="review-bulk-resolve" type="button">Mark Resolved</button>
+                            <button id="review-bulk-cancel" type="button" class="secondary">Cancel</button>
+                        </div>
                     </div>
                     <div id="review-loading" class="loading hidden" role="status" aria-live="polite">Loading review queue...</div>
                     <div id="review-error" class="error hidden" role="alert" aria-live="assertive"></div>
@@ -92,6 +115,7 @@
                         <table id="review-table" class="hidden" aria-label="Human review queue">
                             <thead>
                                 <tr>
+                                    <th scope="col"><input type="checkbox" id="review-select-all" aria-label="Select all tickets"></th>
                                     <th scope="col">ID</th>
                                     <th scope="col">Message</th>
                                     <th scope="col">Category</th>
@@ -106,68 +130,6 @@
                             <tbody id="review-body"></tbody>
                         </table>
                     </div>
-                </section>
-
-                <section id="review-detail" class="card result-section hidden" aria-labelledby="review-detail-heading">
-                    <div class="result-header">
-                        <h2 id="review-detail-heading">Review Ticket Details</h2>
-                        <span id="review-detail-badge" class="badge hidden"></span>
-                    </div>
-                    <div class="result-grid">
-                        <div class="result-item">
-                            <span class="label">Category</span>
-                            <span id="review-detail-category" class="value"></span>
-                        </div>
-                        <div class="result-item">
-                            <span class="label">Confidence</span>
-                            <span id="review-detail-confidence" class="value"></span>
-                        </div>
-                        <div class="result-item">
-                            <span class="label">Risk</span>
-                            <span id="review-detail-risk" class="value"></span>
-                        </div>
-                        <div class="result-item">
-                            <span class="label">Route</span>
-                            <span id="review-detail-route" class="value"></span>
-                        </div>
-                        <div class="result-item">
-                            <span class="label">Status</span>
-                            <span id="review-detail-status" class="value"></span>
-                        </div>
-                        <div class="result-item">
-                            <span class="label">Assigned To</span>
-                            <span id="review-detail-assigned" class="value"></span>
-                        </div>
-                        <div class="result-item full-width">
-                            <span class="label">Summary</span>
-                            <span id="review-detail-summary" class="value"></span>
-                        </div>
-                        <div class="result-item full-width">
-                            <span class="label">Original Message</span>
-                            <span id="review-detail-input" class="value"></span>
-                        </div>
-                        <div class="result-item full-width">
-                            <span class="label">Why Human Review</span>
-                            <span id="review-detail-reason" class="value"></span>
-                        </div>
-                    </div>
-                    <div class="review-actions">
-                        <button id="review-assign-btn" type="button" class="secondary">Assign to Me</button>
-                        <button id="review-status-btn" type="button">Mark as In Review</button>
-                        <button id="review-resolve-btn" type="button" class="secondary">Resolve</button>
-                        <button id="review-close-btn" type="button" class="secondary" style="margin-left: auto;">Close</button>
-                    </div>
-                    <section class="comments-section" aria-labelledby="comments-heading">
-                        <h3 id="comments-heading">Comments</h3>
-                        <div id="comments-loading" class="loading hidden" role="status" aria-live="polite">Loading comments...</div>
-                        <div id="comments-error" class="error hidden" role="alert" aria-live="assertive"></div>
-                        <div id="comments-list" class="comments-list"></div>
-                        <form id="comment-form" class="comment-form" novalidate>
-                            <label for="comment-input">Add a comment</label>
-                            <textarea id="comment-input" rows="2" placeholder="Type your note here..." required></textarea>
-                            <button type="submit" id="comment-submit-btn">Post Comment</button>
-                        </form>
-                    </section>
                 </section>
 
                 <section class="card input-section" aria-labelledby="analysis-heading">
@@ -269,7 +231,19 @@
                                     <option value="error">Error</option>
                                 </select>
                             </div>
+                            <button id="export-csv" type="button" class="secondary" aria-label="Export filtered history to CSV">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Export CSV
+                            </button>
                             <button id="refresh-history" type="button" class="secondary" aria-label="Refresh history">Refresh</button>
+                        </div>
+                    </div>
+                    <div id="history-bulk-toolbar" class="bulk-toolbar hidden" aria-label="Bulk actions">
+                        <span id="history-bulk-count" class="bulk-count">0 selected</span>
+                        <div class="bulk-actions">
+                            <button id="history-bulk-assign" type="button" class="secondary">Assign to Me</button>
+                            <button id="history-bulk-resolve" type="button">Mark Resolved</button>
+                            <button id="history-bulk-cancel" type="button" class="secondary">Cancel</button>
                         </div>
                     </div>
                     <div id="history-loading" class="loading hidden" role="status" aria-live="polite">Loading history...</div>
@@ -284,6 +258,7 @@
                         <table id="history-table" class="hidden" aria-label="Request history">
                             <thead>
                                 <tr>
+                                    <th scope="col"><input type="checkbox" id="history-select-all" aria-label="Select all requests"></th>
                                     <th scope="col">ID</th>
                                     <th scope="col">Message</th>
                                     <th scope="col">Category</th>
@@ -342,6 +317,78 @@
                 </section>
             </section>
         </main>
+
+        <!-- Slide-over Drawer -->
+        <div id="drawer-backdrop" class="drawer-backdrop hidden" aria-hidden="true"></div>
+        <aside id="drawer" class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-heading">
+            <div class="drawer-header">
+                <h2 id="drawer-heading">Ticket Details</h2>
+                <button id="drawer-close" type="button" class="drawer-close-btn" aria-label="Close drawer">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <div class="drawer-content">
+                <div class="drawer-grid">
+                    <div class="drawer-item">
+                        <span class="label">Category</span>
+                        <span id="drawer-category" class="value"></span>
+                    </div>
+                    <div class="drawer-item">
+                        <span class="label">Confidence</span>
+                        <span id="drawer-confidence" class="value"></span>
+                    </div>
+                    <div class="drawer-item">
+                        <span class="label">Risk</span>
+                        <span id="drawer-risk" class="value"></span>
+                    </div>
+                    <div class="drawer-item">
+                        <span class="label">Route</span>
+                        <span id="drawer-route" class="value"></span>
+                    </div>
+                    <div class="drawer-item">
+                        <span class="label">Status</span>
+                        <span id="drawer-status" class="value"></span>
+                    </div>
+                    <div class="drawer-item" id="drawer-assigned-row">
+                        <span class="label">Assigned To</span>
+                        <span id="drawer-assigned" class="value"></span>
+                    </div>
+                    <div class="drawer-item full-width">
+                        <span class="label">Summary</span>
+                        <span id="drawer-summary" class="value"></span>
+                    </div>
+                    <div class="drawer-item full-width">
+                        <span class="label">Original Message</span>
+                        <span id="drawer-input" class="value"></span>
+                    </div>
+                    <div class="drawer-item full-width" id="drawer-reason-row">
+                        <span class="label">Why Human Review</span>
+                        <span id="drawer-reason" class="value"></span>
+                    </div>
+                    <div class="drawer-item full-width" id="drawer-error-row">
+                        <span class="label">Error Reason</span>
+                        <span id="drawer-error" class="value"></span>
+                    </div>
+                </div>
+                <div class="drawer-actions">
+                    <button id="drawer-assign-btn" type="button" class="secondary">Assign to Me</button>
+                    <button id="drawer-status-btn" type="button">Mark as In Review</button>
+                    <button id="drawer-resolve-btn" type="button" class="secondary">Resolve</button>
+                    <button id="drawer-close-btn" type="button" class="secondary" style="margin-left: auto;">Close</button>
+                </div>
+                <section class="comments-section" aria-labelledby="drawer-comments-heading">
+                    <h3 id="drawer-comments-heading">Comments</h3>
+                    <div id="drawer-comments-loading" class="loading hidden" role="status" aria-live="polite">Loading comments...</div>
+                    <div id="drawer-comments-error" class="error hidden" role="alert" aria-live="assertive"></div>
+                    <div id="drawer-comments-list" class="comments-list"></div>
+                    <form id="drawer-comment-form" class="comment-form" novalidate>
+                        <label for="drawer-comment-input">Add a comment</label>
+                        <textarea id="drawer-comment-input" rows="2" placeholder="Type your note here..." required></textarea>
+                        <button type="submit" id="drawer-comment-submit-btn">Post Comment</button>
+                    </form>
+                </section>
+            </div>
+        </aside>
 
         <footer>
             <p>AI Customer Request Triage</p>

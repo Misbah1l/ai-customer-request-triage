@@ -163,6 +163,18 @@ class StatusUpdateRequest(BaseModel):
     assigned_to: int | None = None
 
 
+class BatchStatusUpdateRequest(BaseModel):
+    request_ids: list[int]
+    status: str
+    assigned_to: int | None = None
+
+
+class BatchStatusUpdateResponse(BaseModel):
+    updated: int
+    failed: int
+    results: list[dict]
+
+
 class CommentCreate(BaseModel):
     content: str
 
@@ -482,6 +494,58 @@ def update_ticket_status(request: Request, request_id: int, payload: StatusUpdat
     )
 
     return updated
+
+
+@app.patch("/requests/batch/status", response_model=BatchStatusUpdateResponse)
+def batch_update_ticket_status(request: Request, payload: BatchStatusUpdateRequest, current_user: TokenData = Depends(get_current_active_user)):
+    valid_statuses = {"new", "triaged", "assigned", "in_review", "resolved", "human_review"}
+    if payload.status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(sorted(valid_statuses))}")
+    
+    if not payload.request_ids:
+        raise HTTPException(status_code=400, detail="request_ids cannot be empty")
+    
+    if len(payload.request_ids) > 100:
+        raise HTTPException(status_code=400, detail="Cannot update more than 100 requests at once")
+
+    updated_count = 0
+    failed_count = 0
+    results = []
+
+    for request_id in payload.request_ids:
+        try:
+            updated = update_request_status(
+                request_id=request_id,
+                organization_id=current_user.organization_id,
+                new_status=payload.status,
+                assigned_to=payload.assigned_to,
+            )
+            if updated is None:
+                failed_count += 1
+                results.append({"request_id": request_id, "success": False, "error": "Not found"})
+            else:
+                updated_count += 1
+                results.append({"request_id": request_id, "success": True})
+        except Exception as e:
+            failed_count += 1
+            results.append({"request_id": request_id, "success": False, "error": str(e)})
+
+    if updated_count > 0:
+        record_audit_log(
+            organization_id=current_user.organization_id,
+            user_id=current_user.user_id,
+            action="batch_status_update",
+            resource_type="request",
+            resource_id=None,
+            details=f"Batch updated {updated_count} requests to {payload.status}, assigned_to={payload.assigned_to}",
+            ip_address=_get_client_ip(request),
+        )
+
+    return {
+        "updated": updated_count,
+        "failed": failed_count,
+        "results": results
+    }
 
 
 @app.post("/requests/{request_id}/comments", response_model=CommentResponse)

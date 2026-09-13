@@ -166,28 +166,41 @@ const statHighRisk = document.getElementById("stat-high-risk");
 const statRouted = document.getElementById("stat-routed");
 
 const refreshHistoryBtn = document.getElementById("refresh-history");
+const exportCsvBtn = document.getElementById("export-csv");
 const historyLoading = document.getElementById("history-loading");
 const historyError = document.getElementById("history-error");
 const historyEmpty = document.getElementById("history-empty");
 const historyEmptyAll = document.getElementById("history-empty-all");
 const historyTable = document.getElementById("history-table");
 const historyBody = document.getElementById("history-body");
+const historyBulkToolbar = document.getElementById("history-bulk-toolbar");
+const historyBulkCount = document.getElementById("history-bulk-count");
+const historySelectAll = document.getElementById("history-select-all");
+const historyBulkAssign = document.getElementById("history-bulk-assign");
+const historyBulkResolve = document.getElementById("history-bulk-resolve");
+const historyBulkCancel = document.getElementById("history-bulk-cancel");
 const filterCategory = document.getElementById("filter-category");
 const filterRisk = document.getElementById("filter-risk");
 const filterStatus = document.getElementById("filter-status");
 const searchInput = document.getElementById("search-input");
 
-const historyDetail = document.getElementById("history-detail");
-const detailCategory = document.getElementById("detail-category");
-const detailConfidence = document.getElementById("detail-confidence");
-const detailSummary = document.getElementById("detail-summary");
-const detailRisk = document.getElementById("detail-risk");
-const detailRoute = document.getElementById("detail-route");
-const detailStatus = document.getElementById("detail-status");
-const detailInput = document.getElementById("detail-input");
-const detailError = document.getElementById("detail-error");
-const detailBadge = document.getElementById("detail-badge");
-const closeDetailBtn = document.getElementById("close-detail");
+const drawer = document.getElementById("drawer");
+const drawerBackdrop = document.getElementById("drawer-backdrop");
+const drawerCategory = document.getElementById("drawer-category");
+const drawerConfidence = document.getElementById("drawer-confidence");
+const drawerSummary = document.getElementById("drawer-summary");
+const drawerRisk = document.getElementById("drawer-risk");
+const drawerRoute = document.getElementById("drawer-route");
+const drawerStatus = document.getElementById("drawer-status");
+const drawerAssigned = document.getElementById("drawer-assigned");
+const drawerInput = document.getElementById("drawer-input");
+const drawerReason = document.getElementById("drawer-reason");
+const drawerError = document.getElementById("drawer-error");
+const drawerAssignedRow = document.getElementById("drawer-assigned-row");
+const drawerReasonRow = document.getElementById("drawer-reason-row");
+const drawerErrorRow = document.getElementById("drawer-error-row");
+const drawerCloseBtn = document.getElementById("drawer-close");
+const drawerCloseBtn2 = document.getElementById("drawer-close-btn");
 
 const refreshReviewBtn = document.getElementById("refresh-review");
 const reviewLoading = document.getElementById("review-loading");
@@ -195,34 +208,35 @@ const reviewError = document.getElementById("review-error");
 const reviewEmpty = document.getElementById("review-empty");
 const reviewTable = document.getElementById("review-table");
 const reviewBody = document.getElementById("review-body");
+const reviewBulkToolbar = document.getElementById("review-bulk-toolbar");
+const reviewBulkCount = document.getElementById("review-bulk-count");
+const reviewSelectAll = document.getElementById("review-select-all");
+const reviewBulkAssign = document.getElementById("review-bulk-assign");
+const reviewBulkResolve = document.getElementById("review-bulk-resolve");
+const reviewBulkCancel = document.getElementById("review-bulk-cancel");
 
-const reviewDetail = document.getElementById("review-detail");
-const reviewDetailCategory = document.getElementById("review-detail-category");
-const reviewDetailConfidence = document.getElementById("review-detail-confidence");
-const reviewDetailSummary = document.getElementById("review-detail-summary");
-const reviewDetailRisk = document.getElementById("review-detail-risk");
-const reviewDetailRoute = document.getElementById("review-detail-route");
-const reviewDetailStatus = document.getElementById("review-detail-status");
-const reviewDetailAssigned = document.getElementById("review-detail-assigned");
-const reviewDetailInput = document.getElementById("review-detail-input");
-const reviewDetailReason = document.getElementById("review-detail-reason");
-const reviewDetailBadge = document.getElementById("review-detail-badge");
-const reviewCloseBtn = document.getElementById("review-close-btn");
-const reviewAssignBtn = document.getElementById("review-assign-btn");
-const reviewStatusBtn = document.getElementById("review-status-btn");
-const reviewResolveBtn = document.getElementById("review-resolve-btn");
+const drawerAssignBtn = document.getElementById("drawer-assign-btn");
+const drawerStatusBtn = document.getElementById("drawer-status-btn");
+const drawerResolveBtn = document.getElementById("drawer-resolve-btn");
 
-const commentsList = document.getElementById("comments-list");
-const commentsLoading = document.getElementById("comments-loading");
-const commentsError = document.getElementById("comments-error");
-const commentForm = document.getElementById("comment-form");
-const commentInput = document.getElementById("comment-input");
+const drawerCommentsList = document.getElementById("drawer-comments-list");
+const drawerCommentsLoading = document.getElementById("drawer-comments-loading");
+const drawerCommentsError = document.getElementById("drawer-comments-error");
+const drawerCommentForm = document.getElementById("drawer-comment-form");
+const drawerCommentInput = document.getElementById("drawer-comment-input");
 
 let currentReviewId = null;
 let currentReviewAssignedTo = null;
 
 let allHistoryRequests = [];
 let searchDebounceTimer = null;
+
+let categoryChart = null;
+let riskChart = null;
+
+// Bulk selection state
+let selectedReviewIds = new Set();
+let selectedHistoryIds = new Set();
 
 function showError(element, message) {
     element.textContent = message;
@@ -263,6 +277,161 @@ async function loadStats() {
     }
 }
 
+function computeAnalyticsMetrics() {
+    const categories = ["billing", "technical", "sales", "other"];
+    const risks = ["low", "medium", "high"];
+
+    const categoryCounts = {};
+    categories.forEach(cat => categoryCounts[cat] = 0);
+
+    const riskCounts = {};
+    risks.forEach(risk => riskCounts[risk] = 0);
+
+    allHistoryRequests.forEach(req => {
+        if (req.category && categoryCounts.hasOwnProperty(req.category)) {
+            categoryCounts[req.category]++;
+        } else if (req.category) {
+            categoryCounts["other"]++;
+        }
+
+        if (req.risk && riskCounts.hasOwnProperty(req.risk)) {
+            riskCounts[req.risk]++;
+        }
+    });
+
+    return { categoryCounts, riskCounts };
+}
+
+function updateAnalyticsCharts() {
+    const { categoryCounts, riskCounts } = computeAnalyticsMetrics();
+
+    const categoryLabels = ["Billing", "Technical", "Sales", "Other"];
+    const categoryData = [
+        categoryCounts.billing || 0,
+        categoryCounts.technical || 0,
+        categoryCounts.sales || 0,
+        categoryCounts.other || 0
+    ];
+
+    const riskLabels = ["Low", "Medium", "High"];
+    const riskData = [
+        riskCounts.low || 0,
+        riskCounts.medium || 0,
+        riskCounts.high || 0
+    ];
+
+    const categoryCtx = document.getElementById("category-chart");
+    const riskCtx = document.getElementById("risk-chart");
+
+    if (!categoryCtx || !riskCtx) return;
+
+    if (categoryChart) {
+        categoryChart.destroy();
+    }
+    if (riskChart) {
+        riskChart.destroy();
+    }
+
+    categoryChart = new Chart(categoryCtx, {
+        type: "doughnut",
+        data: {
+            labels: categoryLabels,
+            datasets: [{
+                data: categoryData,
+                backgroundColor: [
+                    "#3b82f6",
+                    "#8b5cf6",
+                    "#f59e0b",
+                    "#9ca3af"
+                ],
+                borderWidth: 2,
+                borderColor: "#ffffff"
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: "bottom",
+                    labels: {
+                        padding: 16,
+                        font: { size: 12 }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                            const value = context.raw;
+                            const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                            return `${context.label}: ${value} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    riskChart = new Chart(riskCtx, {
+        type: "bar",
+        data: {
+            labels: riskLabels,
+            datasets: [{
+                label: "Number of Requests",
+                data: riskData,
+                backgroundColor: [
+                    "#10b981",
+                    "#f59e0b",
+                    "#ef4444"
+                ],
+                borderWidth: 1,
+                borderColor: [
+                    "#059669",
+                    "#d97706",
+                    "#dc2626"
+                ],
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            indexAxis: "y",
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${context.raw} requests`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1,
+                        precision: 0
+                    },
+                    grid: {
+                        display: true,
+                        color: "rgba(0,0,0,0.05)"
+                    }
+                },
+                y: {
+                    grid: {
+                        display: false
+                    }
+                }
+            }
+        }
+    });
+}
+
 function renderResult(data) {
     const ai = data.ai_output;
 
@@ -286,6 +455,7 @@ function renderResult(data) {
     loadStats();
     loadHistory();
     loadReviewQueue();
+    updateAnalyticsCharts();
 }
 
 async function analyzeRequest() {
@@ -345,6 +515,7 @@ async function loadHistory() {
         const data = await response.json();
         allHistoryRequests = data.results || [];
         applyFilters();
+        updateAnalyticsCharts();
     } catch (err) {
         showError(historyError, err.message || "Failed to load request history. The service may be unavailable.");
         historyTable.classList.add("hidden");
@@ -370,6 +541,269 @@ function applyFilters() {
     renderHistory(filtered);
 }
 
+function exportHistoryToCsv() {
+    const categoryFilter = filterCategory.value.toLowerCase();
+    const riskFilter = filterRisk.value.toLowerCase();
+    const statusFilter = filterStatus.value;
+    const searchTerm = searchInput.value.trim();
+
+    const filtered = allHistoryRequests.filter((req) => {
+        const matchesCategory = !categoryFilter || (req.category && req.category.toLowerCase() === categoryFilter);
+        const matchesRisk = !riskFilter || (req.risk && req.risk.toLowerCase() === riskFilter);
+        const matchesStatus = !statusFilter || (req.status && req.status.toLowerCase() === statusFilter);
+        const matchesSearch = !searchTerm || (req.input_text && req.input_text.toLowerCase().includes(searchTerm.toLowerCase()));
+        return matchesCategory && matchesRisk && matchesStatus && matchesSearch;
+    });
+
+    if (filtered.length === 0) {
+        showError(historyError, "No data to export. Please adjust your filters.");
+        return;
+    }
+
+    const headers = ["ID", "Message", "Category", "Risk", "Route", "Status", "Created At"];
+    
+    const escapeCsv = (value) => {
+        if (value === null || value === undefined) return "";
+        const str = String(value);
+        if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+            return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+    };
+
+    const rows = filtered.map(req => [
+        escapeCsv(req.id),
+        escapeCsv(req.input_text),
+        escapeCsv(req.category ? req.category.charAt(0).toUpperCase() + req.category.slice(1) : "N/A"),
+        escapeCsv(req.risk ? req.risk.charAt(0).toUpperCase() + req.risk.slice(1) : "N/A"),
+        escapeCsv(req.route_to),
+        escapeCsv(req.status.replace(/_/g, " ")),
+        escapeCsv(req.timestamp)
+    ]);
+
+    const csvContent = [
+        headers.join(","),
+        ...rows.map(row => row.join(","))
+    ].join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `request-history-${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+// Bulk Selection Functions
+function handleReviewCheckboxChange(requestId, checked) {
+    if (checked) {
+        selectedReviewIds.add(requestId);
+    } else {
+        selectedReviewIds.delete(requestId);
+    }
+    updateReviewBulkToolbar();
+    updateReviewSelectAllState();
+}
+
+function handleHistoryCheckboxChange(requestId, checked) {
+    if (checked) {
+        selectedHistoryIds.add(requestId);
+    } else {
+        selectedHistoryIds.delete(requestId);
+    }
+    updateHistoryBulkToolbar();
+    updateHistorySelectAllState();
+}
+
+function updateReviewSelectAllState() {
+    if (!reviewSelectAll) return;
+    const visibleRows = reviewBody.querySelectorAll("tr[data-request-id]");
+    const selectedCount = Array.from(visibleRows).filter(tr => selectedReviewIds.has(parseInt(tr.dataset.requestId))).length;
+    reviewSelectAll.checked = visibleRows.length > 0 && selectedCount === visibleRows.length;
+    reviewSelectAll.indeterminate = selectedCount > 0 && selectedCount < visibleRows.length;
+}
+
+function updateHistorySelectAllState() {
+    if (!historySelectAll) return;
+    const visibleRows = historyBody.querySelectorAll("tr[data-request-id]");
+    const selectedCount = Array.from(visibleRows).filter(tr => selectedHistoryIds.has(parseInt(tr.dataset.requestId))).length;
+    historySelectAll.checked = visibleRows.length > 0 && selectedCount === visibleRows.length;
+    historySelectAll.indeterminate = selectedCount > 0 && selectedCount < visibleRows.length;
+}
+
+function updateReviewBulkToolbar() {
+    if (!reviewBulkToolbar || !reviewBulkCount) return;
+    const count = selectedReviewIds.size;
+    if (count > 0) {
+        reviewBulkCount.textContent = `${count} selected`;
+        reviewBulkToolbar.classList.remove("hidden");
+    } else {
+        reviewBulkToolbar.classList.add("hidden");
+    }
+}
+
+function updateHistoryBulkToolbar() {
+    if (!historyBulkToolbar || !historyBulkCount) return;
+    const count = selectedHistoryIds.size;
+    if (count > 0) {
+        historyBulkCount.textContent = `${count} selected`;
+        historyBulkToolbar.classList.remove("hidden");
+    } else {
+        historyBulkToolbar.classList.add("hidden");
+    }
+}
+
+function hideReviewBulkToolbar() {
+    selectedReviewIds.clear();
+    if (reviewBulkToolbar) reviewBulkToolbar.classList.add("hidden");
+    if (reviewSelectAll) {
+        reviewSelectAll.checked = false;
+        reviewSelectAll.indeterminate = false;
+    }
+}
+
+function hideHistoryBulkToolbar() {
+    selectedHistoryIds.clear();
+    if (historyBulkToolbar) historyBulkToolbar.classList.add("hidden");
+    if (historySelectAll) {
+        historySelectAll.checked = false;
+        historySelectAll.indeterminate = false;
+    }
+}
+
+function handleReviewSelectAllChange() {
+    if (!reviewSelectAll) return;
+    const visibleRows = reviewBody.querySelectorAll("tr[data-request-id]");
+    if (reviewSelectAll.checked) {
+        visibleRows.forEach(tr => {
+            const id = parseInt(tr.dataset.requestId);
+            selectedReviewIds.add(id);
+            tr.classList.add("selected");
+            tr.querySelector('input[type="checkbox"]').checked = true;
+        });
+    } else {
+        visibleRows.forEach(tr => {
+            const id = parseInt(tr.dataset.requestId);
+            selectedReviewIds.delete(id);
+            tr.classList.remove("selected");
+            tr.querySelector('input[type="checkbox"]').checked = false;
+        });
+    }
+    updateReviewBulkToolbar();
+}
+
+function handleHistorySelectAllChange() {
+    if (!historySelectAll) return;
+    const visibleRows = historyBody.querySelectorAll("tr[data-request-id]");
+    if (historySelectAll.checked) {
+        visibleRows.forEach(tr => {
+            const id = parseInt(tr.dataset.requestId);
+            selectedHistoryIds.add(id);
+            tr.classList.add("selected");
+            tr.querySelector('input[type="checkbox"]').checked = true;
+        });
+    } else {
+        visibleRows.forEach(tr => {
+            const id = parseInt(tr.dataset.requestId);
+            selectedHistoryIds.delete(id);
+            tr.classList.remove("selected");
+            tr.querySelector('input[type="checkbox"]').checked = false;
+        });
+    }
+    updateHistoryBulkToolbar();
+}
+
+// Bulk API Calls
+async function bulkUpdateStatus(requestIds, status, assignedTo = null) {
+    try {
+        const response = await authFetch("/requests/batch/status", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ request_ids: requestIds, status, assigned_to: assignedTo }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.detail || "Batch update failed");
+        }
+
+        return await response.json();
+    } catch (err) {
+        throw err;
+    }
+}
+
+// Bulk Action Handlers
+async function handleReviewBulkAssign() {
+    const ids = Array.from(selectedReviewIds);
+    if (ids.length === 0) return;
+
+    try {
+        const meResponse = await authFetch("/auth/me");
+        if (!meResponse.ok) throw new Error("Failed to get current user");
+        const me = await meResponse.json();
+
+        await bulkUpdateStatus(ids, "assigned", me.id);
+        selectedReviewIds.clear();
+        loadReviewQueue();
+        loadHistory();
+        updateAnalyticsCharts();
+    } catch (err) {
+        showError(reviewError, err.message || "Failed to bulk assign");
+    }
+}
+
+async function handleReviewBulkResolve() {
+    const ids = Array.from(selectedReviewIds);
+    if (ids.length === 0) return;
+
+    try {
+        await bulkUpdateStatus(ids, "resolved", null);
+        selectedReviewIds.clear();
+        loadReviewQueue();
+        loadHistory();
+        updateAnalyticsCharts();
+    } catch (err) {
+        showError(reviewError, err.message || "Failed to bulk resolve");
+    }
+}
+
+async function handleHistoryBulkAssign() {
+    const ids = Array.from(selectedHistoryIds);
+    if (ids.length === 0) return;
+
+    try {
+        const meResponse = await authFetch("/auth/me");
+        if (!meResponse.ok) throw new Error("Failed to get current user");
+        const me = await meResponse.json();
+
+        await bulkUpdateStatus(ids, "assigned", me.id);
+        selectedHistoryIds.clear();
+        loadHistory();
+        updateAnalyticsCharts();
+    } catch (err) {
+        showError(historyError, err.message || "Failed to bulk assign");
+    }
+}
+
+async function handleHistoryBulkResolve() {
+    const ids = Array.from(selectedHistoryIds);
+    if (ids.length === 0) return;
+
+    try {
+        await bulkUpdateStatus(ids, "resolved", null);
+        selectedHistoryIds.clear();
+        loadHistory();
+        updateAnalyticsCharts();
+    } catch (err) {
+        showError(historyError, err.message || "Failed to bulk resolve");
+    }
+}
+
 function renderHistory(requests) {
     historyBody.innerHTML = "";
 
@@ -377,6 +811,7 @@ function renderHistory(requests) {
         historyTable.classList.add("hidden");
         historyEmpty.classList.add("hidden");
         historyEmptyAll.classList.remove("hidden");
+        hideHistoryBulkToolbar();
         return;
     }
 
@@ -384,6 +819,7 @@ function renderHistory(requests) {
         historyTable.classList.add("hidden");
         historyEmpty.classList.remove("hidden");
         historyEmptyAll.classList.add("hidden");
+        hideHistoryBulkToolbar();
         return;
     }
 
@@ -393,25 +829,66 @@ function renderHistory(requests) {
 
     for (const req of requests) {
         const tr = document.createElement("tr");
+        tr.dataset.requestId = req.id;
+        if (selectedHistoryIds.has(req.id)) {
+            tr.classList.add("selected");
+        }
+
+        const tdCheckbox = document.createElement("td");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = req.id;
+        checkbox.addEventListener("change", (e) => {
+            handleHistoryCheckboxChange(req.id, e.target.checked);
+            e.stopPropagation();
+        });
+        tdCheckbox.appendChild(checkbox);
 
         const tdId = document.createElement("td");
         tdId.textContent = req.id;
 
         const tdMessage = document.createElement("td");
+        tdMessage.className = "message-preview";
         tdMessage.textContent = req.input_text;
         tdMessage.title = req.input_text;
 
         const tdCategory = document.createElement("td");
-        tdCategory.textContent = req.category || "N/A";
+        tdCategory.textContent = req.category ? req.category.charAt(0).toUpperCase() + req.category.slice(1) : "N/A";
 
         const tdRisk = document.createElement("td");
-        tdRisk.textContent = req.risk || "N/A";
+        const riskBadge = document.createElement("span");
+        riskBadge.className = "badge";
+        riskBadge.setAttribute("data-risk", req.risk || "low");
+        riskBadge.textContent = (req.risk || "low").charAt(0).toUpperCase() + (req.risk || "low").slice(1);
+        tdRisk.appendChild(riskBadge);
 
         const tdRoute = document.createElement("td");
         tdRoute.textContent = req.route_to;
 
         const tdStatus = document.createElement("td");
-        tdStatus.textContent = req.status;
+        const badgeCell = document.createElement("div");
+        badgeCell.className = "badge-cell";
+        
+        const statusBadge = document.createElement("span");
+        statusBadge.className = "badge";
+        statusBadge.setAttribute("data-status", req.status);
+        statusBadge.textContent = req.status.replace(/_/g, " ");
+        badgeCell.appendChild(statusBadge);
+        
+        const priorityBadge = document.createElement("span");
+        priorityBadge.className = "priority-badge";
+        if (req.risk === "high") {
+            priorityBadge.classList.add("p1");
+            priorityBadge.textContent = "P1 Emergency";
+        } else if (req.risk === "medium") {
+            priorityBadge.classList.add("p2");
+            priorityBadge.textContent = "P2 High";
+        } else {
+            priorityBadge.classList.add("p3");
+            priorityBadge.textContent = "P3 Standard";
+        }
+        badgeCell.appendChild(priorityBadge);
+        tdStatus.appendChild(badgeCell);
 
         const tdTimestamp = document.createElement("td");
         tdTimestamp.textContent = req.timestamp;
@@ -419,11 +896,13 @@ function renderHistory(requests) {
         const tdAction = document.createElement("td");
         const viewBtn = document.createElement("button");
         viewBtn.type = "button";
+        viewBtn.className = "secondary";
         viewBtn.textContent = "View";
         viewBtn.setAttribute("aria-label", `View details for request ${req.id}`);
         viewBtn.addEventListener("click", () => loadDetail(req.id));
         tdAction.appendChild(viewBtn);
 
+        tr.appendChild(tdCheckbox);
         tr.appendChild(tdId);
         tr.appendChild(tdMessage);
         tr.appendChild(tdCategory);
@@ -435,6 +914,8 @@ function renderHistory(requests) {
 
         historyBody.appendChild(tr);
     }
+
+    updateHistorySelectAllState();
 }
 
 async function loadDetail(requestId) {
@@ -456,30 +937,87 @@ async function loadDetail(requestId) {
             data.route_to === "human_review";
 
         if (isReviewLifecycle) {
-            historyDetail.classList.add("hidden");
             setLoading(historyLoading, false);
             loadReviewDetail(requestId);
             return;
         }
 
-        detailCategory.textContent = data.category || "N/A";
-        detailConfidence.textContent = data.confidence ? `${(data.confidence * 100).toFixed(1)}%` : "N/A";
-        detailSummary.textContent = data.summary || "N/A";
-        detailRisk.textContent = data.risk || "N/A";
-        detailRoute.textContent = data.route_to;
-        detailStatus.textContent = data.status;
-        detailInput.textContent = data.input_text || "N/A";
-        detailError.textContent = data.error_reason || "None";
-
-        setBadge(detailBadge, data.status, data.status.replace(/_/g, " "));
-
-        historyDetail.classList.remove("hidden");
-        historyDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+        openDrawer(data, false);
     } catch (err) {
         showError(historyError, err.message || "Failed to load request details. Please try again.");
     } finally {
         setLoading(historyLoading, false);
     }
+}
+
+function openDrawer(data, isReview) {
+    // Populate drawer fields
+    drawerCategory.textContent = data.category || "N/A";
+    drawerConfidence.textContent = data.confidence ? `${(data.confidence * 100).toFixed(1)}%` : "N/A";
+    drawerSummary.textContent = data.summary || "N/A";
+    
+    const riskBadge = document.createElement("span");
+    riskBadge.className = "badge";
+    riskBadge.setAttribute("data-risk", data.risk || "low");
+    riskBadge.textContent = (data.risk || "low").charAt(0).toUpperCase() + (data.risk || "low").slice(1);
+    drawerRisk.innerHTML = "";
+    drawerRisk.appendChild(riskBadge);
+    
+    drawerRoute.textContent = data.route_to;
+    
+    const statusBadge = document.createElement("span");
+    statusBadge.className = "badge";
+    statusBadge.setAttribute("data-status", data.status);
+    statusBadge.textContent = data.status.replace(/_/g, " ");
+    drawerStatus.innerHTML = "";
+    drawerStatus.appendChild(statusBadge);
+    
+    drawerInput.textContent = data.input_text || "N/A";
+
+    // Show/hide review-specific fields
+    if (isReview) {
+        drawerAssignedRow.classList.remove("hidden");
+        drawerAssigned.textContent = data.assigned_to ? `User #${data.assigned_to}` : "Unassigned";
+        
+        drawerReasonRow.classList.remove("hidden");
+        let reason = [];
+        if (data.needs_human) reason.push("AI flagged for human review");
+        if (data.risk === "high") reason.push("High risk");
+        if (data.confidence && data.confidence < 0.80) reason.push("Low confidence");
+        if (data.error_reason) reason.push(data.error_reason);
+        drawerReason.textContent = reason.length > 0 ? reason.join("; ") : "None";
+        
+        drawerErrorRow.classList.add("hidden");
+        
+        // Update assign button text based on assignment
+        if (data.assigned_to) {
+            drawerAssignBtn.textContent = "Unassign";
+        } else {
+            drawerAssignBtn.textContent = "Assign to Me";
+        }
+    } else {
+        drawerAssignedRow.classList.add("hidden");
+        drawerReasonRow.classList.add("hidden");
+        
+        if (data.error_reason) {
+            drawerErrorRow.classList.remove("hidden");
+            drawerError.textContent = data.error_reason;
+        } else {
+            drawerErrorRow.classList.add("hidden");
+        }
+    }
+
+    // Open drawer with animation
+    drawer.classList.add("open");
+    drawerBackdrop.classList.add("open");
+    document.body.style.overflow = "hidden"; // Prevent background scroll
+}
+
+function closeDrawer() {
+    drawer.classList.remove("open");
+    drawerBackdrop.classList.remove("open");
+    document.body.style.overflow = "";
+    currentReviewId = null;
 }
 
 async function loadReviewQueue() {
@@ -510,6 +1048,7 @@ function renderReviewQueue(requests) {
     if (requests.length === 0) {
         reviewTable.classList.add("hidden");
         reviewEmpty.classList.remove("hidden");
+        hideReviewBulkToolbar();
         return;
     }
 
@@ -518,25 +1057,66 @@ function renderReviewQueue(requests) {
 
     for (const req of requests) {
         const tr = document.createElement("tr");
+        tr.dataset.requestId = req.id;
+        if (selectedReviewIds.has(req.id)) {
+            tr.classList.add("selected");
+        }
+
+        const tdCheckbox = document.createElement("td");
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.value = req.id;
+        checkbox.addEventListener("change", (e) => {
+            handleReviewCheckboxChange(req.id, e.target.checked);
+            e.stopPropagation();
+        });
+        tdCheckbox.appendChild(checkbox);
 
         const tdId = document.createElement("td");
         tdId.textContent = req.id;
 
         const tdMessage = document.createElement("td");
+        tdMessage.className = "message-preview";
         tdMessage.textContent = req.input_text;
         tdMessage.title = req.input_text;
 
         const tdCategory = document.createElement("td");
-        tdCategory.textContent = req.category || "N/A";
+        tdCategory.textContent = req.category ? req.category.charAt(0).toUpperCase() + req.category.slice(1) : "N/A";
 
         const tdConfidence = document.createElement("td");
         tdConfidence.textContent = req.confidence ? `${(req.confidence * 100).toFixed(1)}%` : "N/A";
 
         const tdRisk = document.createElement("td");
-        tdRisk.textContent = req.risk || "N/A";
+        const riskBadge = document.createElement("span");
+        riskBadge.className = "badge";
+        riskBadge.setAttribute("data-risk", req.risk || "low");
+        riskBadge.textContent = (req.risk || "low").charAt(0).toUpperCase() + (req.risk || "low").slice(1);
+        tdRisk.appendChild(riskBadge);
 
         const tdStatus = document.createElement("td");
-        tdStatus.textContent = req.status;
+        const badgeCell = document.createElement("div");
+        badgeCell.className = "badge-cell";
+        
+        const statusBadge = document.createElement("span");
+        statusBadge.className = "badge";
+        statusBadge.setAttribute("data-status", req.status);
+        statusBadge.textContent = req.status.replace(/_/g, " ");
+        badgeCell.appendChild(statusBadge);
+        
+        const priorityBadge = document.createElement("span");
+        priorityBadge.className = "priority-badge";
+        if (req.risk === "high") {
+            priorityBadge.classList.add("p1");
+            priorityBadge.textContent = "P1 Emergency";
+        } else if (req.risk === "medium") {
+            priorityBadge.classList.add("p2");
+            priorityBadge.textContent = "P2 High";
+        } else {
+            priorityBadge.classList.add("p3");
+            priorityBadge.textContent = "P3 Standard";
+        }
+        badgeCell.appendChild(priorityBadge);
+        tdStatus.appendChild(badgeCell);
 
         const tdAssigned = document.createElement("td");
         tdAssigned.textContent = req.assigned_to ? `User #${req.assigned_to}` : "Unassigned";
@@ -547,11 +1127,13 @@ function renderReviewQueue(requests) {
         const tdAction = document.createElement("td");
         const viewBtn = document.createElement("button");
         viewBtn.type = "button";
+        viewBtn.className = "secondary";
         viewBtn.textContent = "Review";
         viewBtn.setAttribute("aria-label", `Review ticket ${req.id}`);
         viewBtn.addEventListener("click", () => loadReviewDetail(req.id));
         tdAction.appendChild(viewBtn);
 
+        tr.appendChild(tdCheckbox);
         tr.appendChild(tdId);
         tr.appendChild(tdMessage);
         tr.appendChild(tdCategory);
@@ -564,6 +1146,8 @@ function renderReviewQueue(requests) {
 
         reviewBody.appendChild(tr);
     }
+
+    updateReviewSelectAllState();
 }
 
 async function loadReviewDetail(requestId) {
@@ -579,28 +1163,7 @@ async function loadReviewDetail(requestId) {
 
         const data = await response.json();
 
-        reviewDetailCategory.textContent = data.category || "N/A";
-        reviewDetailConfidence.textContent = data.confidence ? `${(data.confidence * 100).toFixed(1)}%` : "N/A";
-        reviewDetailSummary.textContent = data.summary || "N/A";
-        reviewDetailRisk.textContent = data.risk || "N/A";
-        reviewDetailRoute.textContent = data.route_to;
-        reviewDetailStatus.textContent = data.status;
-        reviewDetailAssigned.textContent = data.assigned_to ? `User #${data.assigned_to}` : "Unassigned";
-        reviewDetailInput.textContent = data.input_text || "N/A";
-
-        let reason = [];
-        if (data.needs_human) reason.push("AI flagged for human review");
-        if (data.risk === "high") reason.push("High risk");
-        if (data.confidence && data.confidence < 0.80) reason.push("Low confidence");
-        if (data.error_reason) reason.push(data.error_reason);
-        reviewDetailReason.textContent = reason.length > 0 ? reason.join("; ") : "None";
-
-        currentReviewAssignedTo = data.assigned_to || null;
-
-        setBadge(reviewDetailBadge, data.status, data.status.replace(/_/g, " "));
-
-        reviewDetail.classList.remove("hidden");
-        reviewDetail.scrollIntoView({ behavior: "smooth", block: "start" });
+        openDrawer(data, true);
 
         loadComments(requestId);
     } catch (err) {
@@ -611,8 +1174,8 @@ async function loadReviewDetail(requestId) {
 }
 
 async function loadComments(requestId) {
-    hideError(commentsError);
-    setLoading(commentsLoading, true);
+    hideError(drawerCommentsError);
+    setLoading(drawerCommentsLoading, true);
 
     try {
         const response = await authFetch(`/requests/${requestId}/comments`);
@@ -623,21 +1186,21 @@ async function loadComments(requestId) {
         const data = await response.json();
         renderComments(data.results || []);
     } catch (err) {
-        showError(commentsError, err.message || "Failed to load comments.");
-        commentsList.innerHTML = "";
+        showError(drawerCommentsError, err.message || "Failed to load comments.");
+        drawerCommentsList.innerHTML = "";
     } finally {
-        setLoading(commentsLoading, false);
+        setLoading(drawerCommentsLoading, false);
     }
 }
 
 function renderComments(comments) {
-    commentsList.innerHTML = "";
+    drawerCommentsList.innerHTML = "";
 
     if (comments.length === 0) {
         const empty = document.createElement("p");
         empty.textContent = "No comments yet.";
         empty.className = "empty-state";
-        commentsList.appendChild(empty);
+        drawerCommentsList.appendChild(empty);
         return;
     }
 
@@ -665,7 +1228,7 @@ function renderComments(comments) {
 
         item.appendChild(header);
         item.appendChild(content);
-        commentsList.appendChild(item);
+        drawerCommentsList.appendChild(item);
     }
 }
 
@@ -673,9 +1236,9 @@ async function postComment(event) {
     event.preventDefault();
     if (!currentReviewId) return;
 
-    const content = commentInput.value.trim();
+    const content = drawerCommentInput.value.trim();
     if (!content) {
-        showError(commentsError, "Comment cannot be empty.");
+        showError(drawerCommentsError, "Comment cannot be empty.");
         return;
     }
 
@@ -691,24 +1254,24 @@ async function postComment(event) {
             throw new Error(errorData.detail || "Failed to post comment.");
         }
 
-        commentInput.value = "";
-        hideError(commentsError);
+        drawerCommentInput.value = "";
+        hideError(drawerCommentsError);
         loadComments(currentReviewId);
     } catch (err) {
-        showError(commentsError, err.message || "Failed to post comment.");
+        showError(drawerCommentsError, err.message || "Failed to post comment.");
     }
 }
 
-commentForm.addEventListener("submit", postComment);
+drawerCommentForm.addEventListener("submit", postComment);
 
 async function updateReviewStatus(newStatus) {
     if (!currentReviewId) return;
 
     try {
         const payload = { status: newStatus };
-        if (reviewAssignBtn.textContent === "Unassign") {
+        if (drawerAssignBtn.textContent === "Unassign") {
             payload.assigned_to = null;
-        } else if (reviewAssignBtn.textContent === "Assign to Me") {
+        } else if (drawerAssignBtn.textContent === "Assign to Me") {
             const meResponse = await authFetch("/auth/me");
             if (meResponse.ok) {
                 const me = await meResponse.json();
@@ -728,14 +1291,20 @@ async function updateReviewStatus(newStatus) {
         }
 
         const data = await response.json();
-        reviewDetailStatus.textContent = data.status;
-        reviewDetailAssigned.textContent = data.assigned_to ? `User #${data.assigned_to}` : "Unassigned";
-        setBadge(reviewDetailBadge, data.status, data.status.replace(/_/g, " "));
+        
+        const statusBadge = document.createElement("span");
+        statusBadge.className = "badge";
+        statusBadge.setAttribute("data-status", data.status);
+        statusBadge.textContent = data.status.replace(/_/g, " ");
+        drawerStatus.innerHTML = "";
+        drawerStatus.appendChild(statusBadge);
+        
+        drawerAssigned.textContent = data.assigned_to ? `User #${data.assigned_to}` : "Unassigned";
 
         if (data.assigned_to) {
-            reviewAssignBtn.textContent = "Unassign";
+            drawerAssignBtn.textContent = "Unassign";
         } else {
-            reviewAssignBtn.textContent = "Assign to Me";
+            drawerAssignBtn.textContent = "Assign to Me";
         }
 
         loadReviewQueue();
@@ -760,9 +1329,24 @@ reviewResolveBtn.addEventListener("click", () => {
     updateReviewStatus("resolved");
 });
 
-reviewCloseBtn.addEventListener("click", () => {
-    reviewDetail.classList.add("hidden");
-    currentReviewId = null;
+drawerCloseBtn.addEventListener("click", closeDrawer);
+drawerCloseBtn2.addEventListener("click", closeDrawer);
+drawerBackdrop.addEventListener("click", closeDrawer);
+
+drawerAssignBtn.addEventListener("click", () => {
+    if (drawerAssignBtn.textContent === "Assign to Me") {
+        updateReviewStatus("assigned");
+    } else {
+        updateReviewStatus("human_review");
+    }
+});
+
+drawerStatusBtn.addEventListener("click", () => {
+    updateReviewStatus("in_review");
+});
+
+drawerResolveBtn.addEventListener("click", () => {
+    updateReviewStatus("resolved");
 });
 
 refreshReviewBtn.addEventListener("click", loadReviewQueue);
@@ -821,6 +1405,24 @@ clearBtn.addEventListener("click", () => {
 
 refreshHistoryBtn.addEventListener("click", loadHistory);
 
+exportCsvBtn.addEventListener("click", exportHistoryToCsv);
+
+// Review Queue Bulk Actions
+reviewSelectAll.addEventListener("change", handleReviewSelectAllChange);
+reviewBulkAssign.addEventListener("click", handleReviewBulkAssign);
+reviewBulkResolve.addEventListener("click", handleReviewBulkResolve);
+reviewBulkCancel.addEventListener("click", () => {
+    hideReviewBulkToolbar();
+});
+
+// History Bulk Actions
+historySelectAll.addEventListener("change", handleHistorySelectAllChange);
+historyBulkAssign.addEventListener("click", handleHistoryBulkAssign);
+historyBulkResolve.addEventListener("click", handleHistoryBulkResolve);
+historyBulkCancel.addEventListener("click", () => {
+    hideHistoryBulkToolbar();
+});
+
 searchInput.addEventListener("input", () => {
     clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
@@ -832,10 +1434,6 @@ filterCategory.addEventListener("change", applyFilters);
 filterRisk.addEventListener("change", applyFilters);
 filterStatus.addEventListener("change", applyFilters);
 
-closeDetailBtn.addEventListener("click", () => {
-    historyDetail.classList.add("hidden");
-});
-
 inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
         e.preventDefault();
@@ -845,9 +1443,7 @@ inputEl.addEventListener("keydown", (e) => {
 
 document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
-        historyDetail.classList.add("hidden");
-        reviewDetail.classList.add("hidden");
-        currentReviewId = null;
+        closeDrawer();
     }
 });
 
