@@ -193,8 +193,11 @@ const filterCategory = document.getElementById("filter-category");
 const filterRisk = document.getElementById("filter-risk");
 const filterStatus = document.getElementById("filter-status");
 const searchInput = document.getElementById("search-input");
-
-const drawer = document.getElementById("drawer");
+const filterStartDate = document.getElementById("filter-start-date");
+const filterEndDate = document.getElementById("filter-end-date");
+const exportCsvBtn = document.getElementById("export-csv");
+const exportSummaryBtn = document.getElementById("export-summary");
+const refreshHistoryBtn = document.getElementById("refresh-history");
 const drawerBackdrop = document.getElementById("drawer-backdrop");
 const drawerCategory = document.getElementById("drawer-category");
 const drawerConfidence = document.getElementById("drawer-confidence");
@@ -688,12 +691,23 @@ function applyFilters() {
     const categoryFilter = filterCategory.value.toLowerCase();
     const riskFilter = filterRisk.value.toLowerCase();
     const statusFilter = filterStatus.value;
+    const startDate = filterStartDate.value ? new Date(filterStartDate.value) : null;
+    const endDate = filterEndDate.value ? new Date(filterEndDate.value + "T23:59:59") : null;
 
     const filtered = allHistoryRequests.filter((req) => {
         const matchesCategory = !categoryFilter || (req.category && req.category.toLowerCase() === categoryFilter);
         const matchesRisk = !riskFilter || (req.risk && req.risk.toLowerCase() === riskFilter);
         const matchesStatus = !statusFilter || (req.status && req.status.toLowerCase() === statusFilter);
-        return matchesCategory && matchesRisk && matchesStatus;
+        
+        // Date filtering
+        let matchesDate = true;
+        if (startDate || endDate) {
+            const reqDate = new Date(req.timestamp);
+            if (startDate && reqDate < startDate) matchesDate = false;
+            if (endDate && reqDate > endDate) matchesDate = false;
+        }
+        
+        return matchesCategory && matchesRisk && matchesStatus && matchesDate;
     });
 
     renderHistory(filtered);
@@ -704,13 +718,24 @@ function exportHistoryToCsv() {
     const riskFilter = filterRisk.value.toLowerCase();
     const statusFilter = filterStatus.value;
     const searchTerm = searchInput.value.trim();
+    const startDate = filterStartDate.value ? new Date(filterStartDate.value) : null;
+    const endDate = filterEndDate.value ? new Date(filterEndDate.value + "T23:59:59") : null;
 
     const filtered = allHistoryRequests.filter((req) => {
         const matchesCategory = !categoryFilter || (req.category && req.category.toLowerCase() === categoryFilter);
         const matchesRisk = !riskFilter || (req.risk && req.risk.toLowerCase() === riskFilter);
         const matchesStatus = !statusFilter || (req.status && req.status.toLowerCase() === statusFilter);
         const matchesSearch = !searchTerm || (req.input_text && req.input_text.toLowerCase().includes(searchTerm.toLowerCase()));
-        return matchesCategory && matchesRisk && matchesStatus && matchesSearch;
+        
+        // Date filtering
+        let matchesDate = true;
+        if (startDate || endDate) {
+            const reqDate = new Date(req.timestamp);
+            if (startDate && reqDate < startDate) matchesDate = false;
+            if (endDate && reqDate > endDate) matchesDate = false;
+        }
+        
+        return matchesCategory && matchesRisk && matchesStatus && matchesSearch && matchesDate;
     });
 
     if (filtered.length === 0) {
@@ -749,6 +774,125 @@ function exportHistoryToCsv() {
     const url = URL.createObjectURL(blob);
     link.setAttribute("href", url);
     link.setAttribute("download", `request-history-${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function exportSummaryReport() {
+    const startDate = filterStartDate.value ? new Date(filterStartDate.value) : null;
+    const endDate = filterEndDate.value ? new Date(filterEndDate.value + "T23:59:59") : null;
+
+    let filtered = allHistoryRequests;
+    
+    // Apply date filtering
+    if (startDate || endDate) {
+        filtered = filtered.filter(req => {
+            const reqDate = new Date(req.timestamp);
+            if (startDate && reqDate < startDate) return false;
+            if (endDate && reqDate > endDate) return false;
+            return true;
+        });
+    }
+
+    if (filtered.length === 0) {
+        showError(historyError, "No data to export. Please adjust your filters.");
+        return;
+    }
+
+    // Calculate aggregated stats
+    const total = filtered.length;
+    const highRiskCount = filtered.filter(r => r.risk === "high").length;
+    const highRiskRatio = total > 0 ? ((highRiskCount / total) * 100).toFixed(2) : "0.00";
+    
+    // Status breakdown
+    const statusCounts = {};
+    filtered.forEach(req => {
+        statusCounts[req.status] = (statusCounts[req.status] || 0) + 1;
+    });
+    
+    const resolvedCount = statusCounts["resolved"] || 0;
+    const humanReviewCount = statusCounts["human_review"] || 0;
+    const routedCount = statusCounts["routed"] || 0;
+    const errorCount = statusCounts["error"] || 0;
+    
+    // Category breakdown
+    const categoryCounts = {};
+    filtered.forEach(req => {
+        const cat = req.category || "other";
+        categoryCounts[cat] = (categoryCounts[cat] || 0) + 1;
+    });
+
+    // Build CSV content
+    const escapeCsv = (value) => {
+        if (value === null || value === undefined) return "";
+        const str = String(value);
+        if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+            return '"' + str.replace(/"/g, '""') + '"';
+        }
+        return str;
+    };
+
+    const rows = [];
+    
+    // Summary section
+    rows.push([escapeCsv("SUMMARY REPORT")]);
+    rows.push([escapeCsv("")]);
+    rows.push([escapeCsv("Generated"), escapeCsv(new Date().toISOString())]);
+    rows.push([escapeCsv("Date Range"), escapeCsv(
+        (filterStartDate.value ? filterStartDate.value : "All time") + " to " + 
+        (filterEndDate.value ? filterEndDate.value : "Present")
+    )]);
+    rows.push([escapeCsv("")]);
+    
+    // Overall stats
+    rows.push([escapeCsv("OVERALL STATISTICS")]);
+    rows.push([escapeCsv("Metric"), escapeCsv("Value")]);
+    rows.push([escapeCsv("Total Processed"), escapeCsv(total)]);
+    rows.push([escapeCsv("High Risk Count"), escapeCsv(highRiskCount)]);
+    rows.push([escapeCsv("High Risk Ratio (%)"), escapeCsv(highRiskRatio)]);
+    rows.push([escapeCsv("")]);
+    
+    // Status breakdown
+    rows.push([escapeCsv("STATUS BREAKDOWN")]);
+    rows.push([escapeCsv("Status"), escapeCsv("Count"), escapeCsv("Percentage")]);
+    Object.entries(statusCounts).forEach(([status, count]) => {
+        const pct = total > 0 ? ((count / total) * 100).toFixed(2) : "0.00";
+        rows.push([escapeCsv(status.replace(/_/g, " ")), escapeCsv(count), escapeCsv(pct + "%")]);
+    });
+    rows.push([escapeCsv("")]);
+    
+    // Category breakdown
+    rows.push([escapeCsv("CATEGORY BREAKDOWN")]);
+    rows.push([escapeCsv("Category"), escapeCsv("Count"), escapeCsv("Percentage")]);
+    Object.entries(categoryCounts).forEach(([cat, count]) => {
+        const pct = total > 0 ? ((count / total) * 100).toFixed(2) : "0.00";
+        rows.push([escapeCsv(cat.charAt(0).toUpperCase() + cat.slice(1)), escapeCsv(count), escapeCsv(pct + "%")]);
+    });
+    rows.push([escapeCsv("")]);
+    
+    // Risk breakdown
+    const riskCounts = {};
+    filtered.forEach(req => {
+        riskCounts[req.risk || "low"] = (riskCounts[req.risk || "low"] || 0) + 1;
+    });
+    rows.push([escapeCsv("RISK BREAKDOWN")]);
+    rows.push([escapeCsv("Risk Level"), escapeCsv("Count"), escapeCsv("Percentage")]);
+    Object.entries(riskCounts).forEach(([risk, count]) => {
+        const pct = total > 0 ? ((count / total) * 100).toFixed(2) : "0.00";
+        rows.push([escapeCsv(risk.charAt(0).toUpperCase() + risk.slice(1)), escapeCsv(count), escapeCsv(pct + "%")]);
+    });
+
+    const csvContent = rows.map(row => row.join(",")).join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    const dateRange = (filterStartDate.value ? filterStartDate.value : "all") + "_" + (filterEndDate.value ? filterEndDate.value : "present");
+    link.setAttribute("download", `summary-report-${dateRange}.csv`);
+    link.setAttribute("href", url);
     link.style.visibility = "hidden";
     document.body.appendChild(link);
     link.click();
@@ -1585,6 +1729,8 @@ refreshHistoryBtn.addEventListener("click", loadHistory);
 
 exportCsvBtn.addEventListener("click", exportHistoryToCsv);
 
+exportSummaryBtn.addEventListener("click", exportSummaryReport);
+
 // Review Queue Bulk Actions
 reviewSelectAll.addEventListener("change", handleReviewSelectAllChange);
 reviewBulkAssign.addEventListener("click", handleReviewBulkAssign);
@@ -1611,6 +1757,8 @@ searchInput.addEventListener("input", () => {
 filterCategory.addEventListener("change", applyFilters);
 filterRisk.addEventListener("change", applyFilters);
 filterStatus.addEventListener("change", applyFilters);
+filterStartDate.addEventListener("change", applyFilters);
+filterEndDate.addEventListener("change", applyFilters);
 
 inputEl.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
