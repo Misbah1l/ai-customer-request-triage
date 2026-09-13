@@ -94,6 +94,7 @@ async function loadUser() {
         }
         
         showDashboard();
+        startReviewPolling();
     } catch (err) {
         localStorage.removeItem(AUTH_STORAGE_KEY);
         currentUser = null;
@@ -104,6 +105,7 @@ async function loadUser() {
 function logout() {
     localStorage.removeItem(AUTH_STORAGE_KEY);
     currentUser = null;
+    stopReviewPolling();
     showAuth();
     hideAuthError();
 }
@@ -246,6 +248,11 @@ let riskChart = null;
 let selectedReviewIds = new Set();
 let selectedHistoryIds = new Set();
 
+// Polling state
+let knownReviewTicketIds = new Set();
+let reviewPollingInterval = null;
+const POLLING_INTERVAL_MS = 10000; // 10 seconds
+
 function showError(element, message) {
     element.textContent = message;
     element.classList.remove("hidden");
@@ -264,6 +271,149 @@ function setBadge(element, variant, text) {
     element.textContent = text;
     element.setAttribute("data-variant", variant);
     element.classList.remove("hidden");
+}
+
+// Toast notification system
+function showToast(message, type = "info") {
+    const container = getOrCreateToastContainer();
+    const toast = document.createElement("div");
+    toast.className = `toast toast-${type}`;
+    toast.setAttribute("role", "alert");
+    toast.setAttribute("aria-live", "polite");
+    
+    const icons = {
+        info: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>',
+        warning: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+        success: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>',
+    };
+    
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <span class="toast-message">${message}</span>
+        <button class="toast-close" aria-label="Dismiss">&times;</button>
+    `;
+    
+    toast.querySelector(".toast-close").addEventListener("click", () => {
+        toast.classList.add("toast-hiding");
+        setTimeout(() => toast.remove(), 300);
+    });
+    
+    container.appendChild(toast);
+    
+    // Auto-remove after 8 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.classList.add("toast-hiding");
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, 8000);
+}
+
+function getOrCreateToastContainer() {
+    let container = document.getElementById("toast-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "toast-container";
+        container.className = "toast-container";
+        document.body.appendChild(container);
+    }
+    return container;
+}
+
+function playNotificationSound() {
+    // Create a subtle click sound using Web Audio API
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(400, audioContext.currentTime + 0.1);
+        
+        gainNode.gain.setValueAtTime(0.05, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.15);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.15);
+    } catch (e) {
+        // Silently fail if audio is not available
+        console.debug("Notification sound failed:", e);
+    }
+}
+
+// Background polling for new high-risk review tickets
+async function pollReviewQueue() {
+    try {
+        const response = await authFetch("/requests/review");
+        if (!response.ok) {
+            return;
+        }
+        
+        const data = await response.json();
+        const currentTickets = data.results || [];
+        const currentIds = new Set(currentTickets.map(t => t.id));
+        
+        // Check for new tickets
+        const newTickets = currentTickets.filter(t => !knownReviewTicketIds.has(t.id));
+        
+        if (newTickets.length > 0) {
+            // Update known IDs
+            knownReviewTicketIds = currentIds;
+            
+            // Play notification sound
+            playNotificationSound();
+            
+            // Show toast for each new ticket
+            for (const ticket of newTickets) {
+                const riskLabel = ticket.risk === "high" ? "HIGH RISK" : ticket.risk?.toUpperCase() || "REVIEW";
+                showToast(`New ${riskLabel} ticket #${ticket.id} requires review`, ticket.risk === "high" ? "warning" : "info");
+            }
+            
+            // Refresh the review queue UI
+            loadReviewQueue();
+            loadStats();
+            updateAnalyticsCharts();
+        } else if (currentIds.size !== knownReviewTicketIds.size) {
+            // Tickets were removed (resolved/assigned), update known IDs and refresh
+            knownReviewTicketIds = currentIds;
+            loadReviewQueue();
+            loadStats();
+            updateAnalyticsCharts();
+        }
+    } catch (err) {
+        console.debug("Polling error:", err);
+    }
+}
+
+function startReviewPolling() {
+    if (reviewPollingInterval) {
+        clearInterval(reviewPollingInterval);
+    }
+    
+    // Initialize known IDs on first run
+    authFetch("/requests/review")
+        .then(response => response.json())
+        .then(data => {
+            knownReviewTicketIds = new Set((data.results || []).map(t => t.id));
+        })
+        .catch(() => {
+            knownReviewTicketIds = new Set();
+        });
+    
+    // Start polling
+    reviewPollingInterval = setInterval(pollReviewQueue, POLLING_INTERVAL_MS);
+}
+
+function stopReviewPolling() {
+    if (reviewPollingInterval) {
+        clearInterval(reviewPollingInterval);
+        reviewPollingInterval = null;
+    }
+    knownReviewTicketIds.clear();
 }
 
 async function loadStats() {
