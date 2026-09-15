@@ -11,6 +11,15 @@ from datetime import datetime
 from typing import Optional
 import os
 
+class NoCacheStaticFiles(StaticFiles):
+    """StaticFiles with cache-busting headers for development."""
+    def file_response(self, *args, **kwargs) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
+
 from src.workflow import run_workflow, export_workflow
 from src.db import (
     init_db,
@@ -78,7 +87,7 @@ app.add_middleware(
 )
 
 frontend_dir = Path(__file__).resolve().parent.parent / "frontend"
-app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=str(frontend_dir)), name="static")
 
 
 def _get_frontend_api_base() -> str:
