@@ -132,28 +132,31 @@ function toggleAuthMode(mode) {
 window.toggleAuthMode = toggleAuthMode;
 
 // Handle auth form submission - determines which form and calls appropriate handler
-function handleAuthSubmit(event) {
-    const form = event.target;
-    const formId = form.id;
+function handleAuthSubmit(mode) {
+    // Immediately transition UI to dashboard (visual feedback)
+    showDashboard();
     
-    if (formId === "login-form") {
+    if (mode === "login") {
         const email = document.getElementById("login-email").value.trim();
         const password = document.getElementById("login-password").value;
         if (!email || !password) {
             showAuthError("Please enter both email and password.");
+            showAuth(); // Show auth again if validation fails
             return;
         }
         login(email, password);
-    } else if (formId === "register-form") {
+    } else if (mode === "register") {
         const name = document.getElementById("register-name").value.trim();
         const email = document.getElementById("register-email").value.trim();
         const password = document.getElementById("register-password").value;
         if (!name || !email || !password) {
             showAuthError("Please fill in all fields.");
+            showAuth(); // Show auth again if validation fails
             return;
         }
         if (password.length < 8) {
             showAuthError("Password must be at least 8 characters.");
+            showAuth(); // Show auth again if validation fails
             return;
         }
         register(name, email, password);

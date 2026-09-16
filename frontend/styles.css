@@ -171,6 +171,12 @@ body {
     min-height: 45vh;
 }
 
+#auth-container {
+    position: relative;
+    z-index: 9999;
+    pointer-events: auto;
+}
+
 .auth-card {
     background: var(--card-bg);
     border-radius: var(--radius-lg);
