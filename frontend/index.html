@@ -31,7 +31,7 @@
                         <input type="password" id="login-password" required autocomplete="current-password" />
                         <button type="submit" id="login-btn">Sign In</button>
                         <p class="auth-switch">
-                            Don't have an account? <button type="button" id="show-register" class="link-btn">Create one</button>
+                            Don't have an account? <button type="button" id="show-register" class="link-btn" onclick="toggleAuthMode('register')">Create one</button>
                         </p>
                     </form>
                     <form id="register-form" class="hidden" novalidate>
@@ -43,7 +43,7 @@
                         <input type="password" id="register-password" required minlength="8" autocomplete="new-password" />
                         <button type="submit" id="register-btn">Create Account</button>
                         <p class="auth-switch">
-                            Already have an account? <button type="button" id="show-login" class="link-btn">Sign in</button>
+                            Already have an account? <button type="button" id="show-login" class="link-btn" onclick="toggleAuthMode('login')">Sign in</button>
                         </p>
                     </form>
                     <div id="auth-error" class="error hidden" role="alert" aria-live="assertive"></div>

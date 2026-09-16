@@ -110,6 +110,24 @@ function logout() {
     hideAuthError();
 }
 
+// Simple auth mode toggle - can be called inline or from JS
+function toggleAuthMode(mode) {
+    hideAuthError();
+    const loginForm = document.getElementById("login-form");
+    const registerForm = document.getElementById("register-form");
+    const authHeading = document.getElementById("auth-heading");
+    
+    if (mode === "register") {
+        loginForm.classList.add("hidden");
+        registerForm.classList.remove("hidden");
+        if (authHeading) authHeading.textContent = "Create Account";
+    } else {
+        registerForm.classList.add("hidden");
+        loginForm.classList.remove("hidden");
+        if (authHeading) authHeading.textContent = "Sign In";
+    }
+}
+
 async function login(email, password) {
     hideAuthError();
     try {
@@ -1673,104 +1691,98 @@ drawerResolveBtn.addEventListener("click", () => {
 
 refreshReviewBtn.addEventListener("click", loadReviewQueue);
 
-document.getElementById("login-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const email = document.getElementById("login-email").value.trim();
-    const password = document.getElementById("login-password").value;
-    if (!email || !password) {
-        showAuthError("Please enter both email and password.");
-        return;
-    }
-    login(email, password);
-});
-
-document.getElementById("register-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    const name = document.getElementById("register-name").value.trim();
-    const email = document.getElementById("register-email").value.trim();
-    const password = document.getElementById("register-password").value;
-    if (!name || !email || !password) {
-        showAuthError("Please fill in all fields.");
-        return;
-    }
-    if (password.length < 8) {
-        showAuthError("Password must be at least 8 characters.");
-        return;
-    }
-    register(name, email, password);
-});
-
-document.getElementById("show-register").addEventListener("click", () => {
-    hideAuthError();
-    document.getElementById("login-form").classList.add("hidden");
-    document.getElementById("register-form").classList.remove("hidden");
-    document.getElementById("auth-heading").textContent = "Create Account";
-});
-
-document.getElementById("show-login").addEventListener("click", () => {
-    hideAuthError();
-    document.getElementById("register-form").classList.add("hidden");
-    document.getElementById("login-form").classList.remove("hidden");
-    document.getElementById("auth-heading").textContent = "Sign In";
-});
-
-document.getElementById("logout-btn").addEventListener("click", logout);
-
-analyzeBtn.addEventListener("click", analyzeRequest);
-
-clearBtn.addEventListener("click", () => {
-    inputEl.value = "";
-    hideError(errorEl);
-    resultSection.classList.add("hidden");
-    inputEl.focus();
-});
-
-refreshHistoryBtn.addEventListener("click", loadHistory);
-
-exportCsvBtn.addEventListener("click", exportHistoryToCsv);
-
-exportSummaryBtn.addEventListener("click", exportSummaryReport);
-
-// Review Queue Bulk Actions
-reviewSelectAll.addEventListener("change", handleReviewSelectAllChange);
-reviewBulkAssign.addEventListener("click", handleReviewBulkAssign);
-reviewBulkResolve.addEventListener("click", handleReviewBulkResolve);
-reviewBulkCancel.addEventListener("click", () => {
-    hideReviewBulkToolbar();
-});
-
-// History Bulk Actions
-historySelectAll.addEventListener("change", handleHistorySelectAllChange);
-historyBulkAssign.addEventListener("click", handleHistoryBulkAssign);
-historyBulkResolve.addEventListener("click", handleHistoryBulkResolve);
-historyBulkCancel.addEventListener("click", () => {
-    hideHistoryBulkToolbar();
-});
-
-searchInput.addEventListener("input", () => {
-    clearTimeout(searchDebounceTimer);
-    searchDebounceTimer = setTimeout(() => {
-        loadHistory();
-    }, 300);
-});
-
-filterCategory.addEventListener("change", applyFilters);
-filterRisk.addEventListener("change", applyFilters);
-filterStatus.addEventListener("change", applyFilters);
-filterStartDate.addEventListener("change", applyFilters);
-filterEndDate.addEventListener("change", applyFilters);
-
-inputEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+// Initialize all event listeners after DOM is ready
+document.addEventListener("DOMContentLoaded", () => {
+    // Auth form submit handlers
+    document.getElementById("login-form").addEventListener("submit", (e) => {
         e.preventDefault();
-        analyzeRequest();
-    }
-});
+        const email = document.getElementById("login-email").value.trim();
+        const password = document.getElementById("login-password").value;
+        if (!email || !password) {
+            showAuthError("Please enter both email and password.");
+            return;
+        }
+        login(email, password);
+    });
 
-document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") {
-        closeDrawer();
-    }
-});
+    document.getElementById("register-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        const name = document.getElementById("register-name").value.trim();
+        const email = document.getElementById("register-email").value.trim();
+        const password = document.getElementById("register-password").value;
+        if (!name || !email || !password) {
+            showAuthError("Please fill in all fields.");
+            return;
+        }
+        if (password.length < 8) {
+            showAuthError("Password must be at least 8 characters.");
+            return;
+        }
+        register(name, email, password);
+    });
 
-loadUser();
+    // Auth mode toggle handlers (also available via inline onclick)
+    document.getElementById("show-register").addEventListener("click", () => toggleAuthMode("register"));
+    document.getElementById("show-login").addEventListener("click", () => toggleAuthMode("login"));
+
+    document.getElementById("logout-btn").addEventListener("click", logout);
+
+    analyzeBtn.addEventListener("click", analyzeRequest);
+
+    clearBtn.addEventListener("click", () => {
+        inputEl.value = "";
+        hideError(errorEl);
+        resultSection.classList.add("hidden");
+        inputEl.focus();
+    });
+
+    refreshHistoryBtn.addEventListener("click", loadHistory);
+
+    exportCsvBtn.addEventListener("click", exportHistoryToCsv);
+
+    exportSummaryBtn.addEventListener("click", exportSummaryReport);
+
+    // Review Queue Bulk Actions
+    reviewSelectAll.addEventListener("change", handleReviewSelectAllChange);
+    reviewBulkAssign.addEventListener("click", handleReviewBulkAssign);
+    reviewBulkResolve.addEventListener("click", handleReviewBulkResolve);
+    reviewBulkCancel.addEventListener("click", () => {
+        hideReviewBulkToolbar();
+    });
+
+    // History Bulk Actions
+    historySelectAll.addEventListener("change", handleHistorySelectAllChange);
+    historyBulkAssign.addEventListener("click", handleHistoryBulkAssign);
+    historyBulkResolve.addEventListener("click", handleHistoryBulkResolve);
+    historyBulkCancel.addEventListener("click", () => {
+        hideHistoryBulkToolbar();
+    });
+
+    searchInput.addEventListener("input", () => {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => {
+            loadHistory();
+        }, 300);
+    });
+
+    filterCategory.addEventListener("change", applyFilters);
+    filterRisk.addEventListener("change", applyFilters);
+    filterStatus.addEventListener("change", applyFilters);
+    filterStartDate.addEventListener("change", applyFilters);
+    filterEndDate.addEventListener("change", applyFilters);
+
+    inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault();
+            analyzeRequest();
+        }
+    });
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+            closeDrawer();
+        }
+    });
+
+    loadUser();
+});
