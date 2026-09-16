@@ -24,7 +24,7 @@
                 <div class="auth-card">
                     <h2 id="auth-heading">Sign In</h2>
                     <p class="section-description">Enter your credentials to access your workspace.</p>
-                    <form id="login-form" novalidate>
+                    <form id="login-form" novalidate onsubmit="event.preventDefault(); handleAuthSubmit(event);">
                         <label for="login-email">Email</label>
                         <input type="email" id="login-email" required autocomplete="email" />
                         <label for="login-password">Password</label>
@@ -34,7 +34,7 @@
                             Don't have an account? <button type="button" id="show-register" class="link-btn" onclick="toggleAuthMode('register')">Create one</button>
                         </p>
                     </form>
-                    <form id="register-form" class="hidden" novalidate>
+                    <form id="register-form" class="hidden" novalidate onsubmit="event.preventDefault(); handleAuthSubmit(event);">
                         <label for="register-name">Full Name</label>
                         <input type="text" id="register-name" required autocomplete="name" />
                         <label for="register-email">Email</label>

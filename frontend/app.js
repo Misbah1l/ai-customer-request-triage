@@ -128,6 +128,41 @@ function toggleAuthMode(mode) {
     }
 }
 
+// Expose globally for inline HTML event handlers
+window.toggleAuthMode = toggleAuthMode;
+
+// Handle auth form submission - determines which form and calls appropriate handler
+function handleAuthSubmit(event) {
+    const form = event.target;
+    const formId = form.id;
+    
+    if (formId === "login-form") {
+        const email = document.getElementById("login-email").value.trim();
+        const password = document.getElementById("login-password").value;
+        if (!email || !password) {
+            showAuthError("Please enter both email and password.");
+            return;
+        }
+        login(email, password);
+    } else if (formId === "register-form") {
+        const name = document.getElementById("register-name").value.trim();
+        const email = document.getElementById("register-email").value.trim();
+        const password = document.getElementById("register-password").value;
+        if (!name || !email || !password) {
+            showAuthError("Please fill in all fields.");
+            return;
+        }
+        if (password.length < 8) {
+            showAuthError("Password must be at least 8 characters.");
+            return;
+        }
+        register(name, email, password);
+    }
+}
+
+// Expose globally for inline HTML event handlers
+window.handleAuthSubmit = handleAuthSubmit;
+
 async function login(email, password) {
     hideAuthError();
     try {
@@ -1693,34 +1728,6 @@ refreshReviewBtn.addEventListener("click", loadReviewQueue);
 
 // Initialize all event listeners after DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
-    // Auth form submit handlers
-    document.getElementById("login-form").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const email = document.getElementById("login-email").value.trim();
-        const password = document.getElementById("login-password").value;
-        if (!email || !password) {
-            showAuthError("Please enter both email and password.");
-            return;
-        }
-        login(email, password);
-    });
-
-    document.getElementById("register-form").addEventListener("submit", (e) => {
-        e.preventDefault();
-        const name = document.getElementById("register-name").value.trim();
-        const email = document.getElementById("register-email").value.trim();
-        const password = document.getElementById("register-password").value;
-        if (!name || !email || !password) {
-            showAuthError("Please fill in all fields.");
-            return;
-        }
-        if (password.length < 8) {
-            showAuthError("Password must be at least 8 characters.");
-            return;
-        }
-        register(name, email, password);
-    });
-
     // Auth mode toggle handlers (also available via inline onclick)
     document.getElementById("show-register").addEventListener("click", () => toggleAuthMode("register"));
     document.getElementById("show-login").addEventListener("click", () => toggleAuthMode("login"));
