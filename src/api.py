@@ -97,12 +97,22 @@ def _get_frontend_api_base() -> str:
 @app.get("/")
 def serve_frontend():
     html_path = frontend_dir / "index.html"
-    content = html_path.read_text(encoding="utf-8")
     api_base = _get_frontend_api_base()
+    content = html_path.read_text(encoding="utf-8")
     if api_base:
         script = f'<script>window.API_BASE="{api_base}";</script>'
         content = content.replace("</head>", f"{script}</head>")
-    return Response(content, media_type="text/html")
+    
+    from fastapi.responses import Response
+    return Response(
+        content=content,
+        media_type="text/html",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 
 class AIOutputResponse(BaseModel):
