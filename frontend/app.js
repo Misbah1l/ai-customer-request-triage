@@ -1728,6 +1728,7 @@ refreshReviewBtn.addEventListener("click", loadReviewQueue);
 
 // Initialize all event listeners after DOM is ready
 document.addEventListener("DOMContentLoaded", () => {
+    try {
     // Auth mode toggle handlers (also available via inline onclick)
     document.getElementById("show-register").addEventListener("click", () => toggleAuthMode("register"));
     document.getElementById("show-login").addEventListener("click", () => toggleAuthMode("login"));
@@ -1793,3 +1794,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadUser();
 });
+} catch (err) {
+    console.error("App initialization failed:", err);
+}

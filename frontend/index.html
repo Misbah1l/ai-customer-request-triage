@@ -20,6 +20,7 @@
         </header>
 
         <main>
+            <div id="auth-container">
             <section id="auth-section" class="auth-section">
                 <div class="auth-card">
                     <h2 id="auth-heading">Sign In</h2>
@@ -29,7 +30,7 @@
                         <input type="email" id="login-email" required autocomplete="email" />
                         <label for="login-password">Password</label>
                         <input type="password" id="login-password" required autocomplete="current-password" />
-                        <button type="submit" id="login-btn">Sign In</button>
+                        <button type="submit" id="login-btn" onclick="handleAuthSubmit(event)">Sign In</button>
                         <p class="auth-switch">
                             Don't have an account? <button type="button" id="show-register" class="link-btn" onclick="toggleAuthMode('register')">Create one</button>
                         </p>
@@ -41,7 +42,7 @@
                         <input type="email" id="register-email" required autocomplete="email" />
                         <label for="register-password">Password</label>
                         <input type="password" id="register-password" required minlength="8" autocomplete="new-password" />
-                        <button type="submit" id="register-btn">Create Account</button>
+                        <button type="submit" id="register-btn" onclick="handleAuthSubmit(event)">Create Account</button>
                         <p class="auth-switch">
                             Already have an account? <button type="button" id="show-login" class="link-btn" onclick="toggleAuthMode('login')">Sign in</button>
                         </p>
@@ -49,6 +50,7 @@
                     <div id="auth-error" class="error hidden" role="alert" aria-live="assertive"></div>
                 </div>
             </section>
+        </div>
 
             <section id="dashboard-section" class="hidden">
                 <div class="user-bar">
