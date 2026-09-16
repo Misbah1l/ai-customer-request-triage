@@ -1805,7 +1805,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     loadUser();
+    } catch (err) {
+        console.error("App initialization failed:", err);
+    }
 });
-} catch (err) {
-    console.error("App initialization failed:", err);
-}
